@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+
+# e.firma — NUNCA subir al repo
+*.cer
+*.key
+
+# Configuración local
+.env
+
+# Descargas (XMLs pueden pesar mucho)
+descargas/
+
+# IDE
+.vscode/
+.idea/
+*.DS_Store
