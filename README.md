@@ -1,5 +1,7 @@
 # cfdi-descarga-masiva
 
+> Vibecoded con [Claude](https://claude.ai) - construido en una sesión usando Claude Code como copiloto principal.
+
 Herramienta Python para descargar facturas (CFDI) del SAT México vía el Web Service de Descarga Masiva oficial.
 
 Implementa el flujo completo en 4 pasos:
@@ -8,7 +10,6 @@ Implementa el flujo completo en 4 pasos:
 3. **VerificaSolicitudDescarga** — polling hasta que la solicitud termina
 4. **DescargaMasiva** — descarga paquetes ZIP, extrae XMLs
 
-> [!NOTE]
 > El WS usa SOAP + WS-Security + XMLdsig con firma RSA-SHA1 sobre el timestamp. No hay SDKs oficiales del SAT en Python — esta implementación fue construida directamente desde la [documentación oficial SAT v1.2 (dic 2023)](https://www.sat.gob.mx/cs/Satellite?blobcol=urldata&blobkey=id&blobtable=MungoBlobs&blobwhere=1461173981678&ssbinary=true).
 
 ## Requisitos
@@ -42,8 +43,6 @@ SAT_CERT_PATH=/ruta/a/tu/efirma.cer
 SAT_KEY_PATH=/ruta/a/tu/efirma.key
 SAT_KEY_PASSWORD=tu_contraseña
 ```
-
-> [!WARNING]
 > **Nunca subas tu e.firma al repositorio.** El `.gitignore` ya excluye `*.cer` y `*.key`. Guarda tus archivos fuera del directorio del proyecto, por ejemplo en `~/.sat-efirma/`.
 
 ## Uso
@@ -123,7 +122,7 @@ sat_cfdi/
 
 ## Integración con bases de datos
 
-Esta herramienta descarga y parsea — la persistencia queda a tu criterio.
+Esta herramienta descarga y parsea, la persistencia queda a tu criterio.
 
 Si usas **Supabase / PostgreSQL**, el modelo `CFDI` incluye todos los campos necesarios. Ejemplo mínimo de loader:
 
@@ -171,7 +170,20 @@ Si recibes **5003**, divide el rango de fechas en períodos más cortos (por mes
 - Los paquetes descargados contienen ZIPs con XMLs individuales por CFDI.
 - Máximo ~200k CFDIs por solicitud. Con más, el SAT retorna código 5003.
 - Soporta CFDI 4.0. Los CFDI de Retenciones tienen estructura diferente — actualmente el parser cubre facturas estándar.
-- Los endpoints SAT usan TLS con certificados que Python no reconoce por defecto; se usa `verify=False` con `requests`. Esto es un conocido inconveniente del SAT.
+- Los endpoints SAT usan TLS con certificados que Python no reconoce por defecto; se usa `verify=False` con `requests`. Esto genera el siguiente warning esperado — **no es un error**:
+
+  ```
+  InsecureRequestWarning: Unverified HTTPS request is being made to host
+  'cfdidescargamasivasolicitud.clouda.sat.gob.mx'. Adding certificate
+  verification is strongly advised.
+  ```
+
+  Para suprimirlo si molesta en producción:
+
+  ```python
+  import urllib3
+  urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+  ```
 
 ## Licencia
 

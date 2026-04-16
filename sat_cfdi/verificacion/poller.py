@@ -1,5 +1,6 @@
 """Verificador de estado de solicitudes SolicitaDescarga."""
 import time
+import click
 from lxml import etree
 import requests
 from sat_cfdi.auth.certificado import CertificadoEfirma
@@ -75,8 +76,8 @@ class VerificadorSolicitud(EnvolventerSOAP):
                     f"(código {respuesta.get('codigo_estado')})"
                 )
 
-            print(
-                f"[{intento}/{max_intentos}] Estado: {self.ESTADOS.get(estado, '?')} "
+            click.echo(
+                f"  [{intento}/{max_intentos}] Estado: {self.ESTADOS.get(estado, '?')} "
                 f"— esperando {intervalo_segundos}s..."
             )
             time.sleep(intervalo_segundos)

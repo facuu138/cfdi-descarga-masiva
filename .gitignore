@@ -22,3 +22,6 @@ descargas/
 .vscode/
 .idea/
 *.DS_Store
+
+# Claude Code (configuración local)
+.claude/
