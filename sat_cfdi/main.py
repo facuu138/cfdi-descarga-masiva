@@ -3,12 +3,15 @@ import csv
 import json
 import os
 import sys
+import urllib3
 from pathlib import Path
 
 import click
 from dotenv import load_dotenv
 
 load_dotenv()
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 @click.group()
