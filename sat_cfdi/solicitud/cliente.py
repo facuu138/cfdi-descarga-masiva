@@ -1,10 +1,34 @@
 """Cliente SOAP para solicitar descarga masiva de CFDI."""
+import json
 import requests
+from pathlib import Path
 from lxml import etree
 from sat_cfdi.auth.certificado import CertificadoEfirma
 from .constructor import ConstructorSolicitud
 
 NS_DES = "http://DescargaMasivaTerceros.sat.gob.mx"
+
+_CACHE_PATH = Path("descargas/.solicitudes.json")
+
+
+def _cache_key(rfc: str, fecha_inicial: str, fecha_final: str, tipo: str) -> str:
+    return f"{rfc}|{fecha_inicial}|{fecha_final}|{tipo}"
+
+
+def _cache_load() -> dict:
+    if _CACHE_PATH.exists():
+        try:
+            return json.loads(_CACHE_PATH.read_text())
+        except Exception:
+            return {}
+    return {}
+
+
+def _cache_save(key: str, id_solicitud: str) -> None:
+    _CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    cache = _cache_load()
+    cache[key] = id_solicitud
+    _CACHE_PATH.write_text(json.dumps(cache, indent=2))
 
 
 class ClienteSolicitud:
@@ -50,6 +74,7 @@ class ClienteSolicitud:
         Returns:
             IdSolicitud
         """
+        cache_key = _cache_key(rfc_emisor, fecha_inicial, fecha_final, "emitidas")
         envelope_xml = self.constructor.construir_emitidos(
             fecha_inicial=fecha_inicial,
             fecha_final=fecha_final,
@@ -59,7 +84,12 @@ class ClienteSolicitud:
             tipo_comprobante=tipo_comprobante,
             rfc_receptores=rfc_receptores,
         )
-        return self._post(envelope_xml, self.SOAP_ACTION_EMITIDOS, "SolicitaDescargaEmitidosResult")
+        id_solicitud = self._post(
+            envelope_xml, self.SOAP_ACTION_EMITIDOS, "SolicitaDescargaEmitidosResult",
+            cache_key=cache_key,
+        )
+        _cache_save(cache_key, id_solicitud)
+        return id_solicitud
 
     def solicitar_recibidas(
         self,
@@ -84,6 +114,7 @@ class ClienteSolicitud:
         Returns:
             IdSolicitud
         """
+        cache_key = _cache_key(rfc_receptor, fecha_inicial, fecha_final, "recibidas")
         envelope_xml = self.constructor.construir_recibidos(
             fecha_inicial=fecha_inicial,
             fecha_final=fecha_final,
@@ -93,9 +124,14 @@ class ClienteSolicitud:
             tipo_comprobante=tipo_comprobante,
             rfc_emisor=rfc_emisor,
         )
-        return self._post(envelope_xml, self.SOAP_ACTION_RECIBIDOS, "SolicitaDescargaRecibidosResult")
+        id_solicitud = self._post(
+            envelope_xml, self.SOAP_ACTION_RECIBIDOS, "SolicitaDescargaRecibidosResult",
+            cache_key=cache_key,
+        )
+        _cache_save(cache_key, id_solicitud)
+        return id_solicitud
 
-    def _post(self, envelope_xml: str, soap_action: str, result_tag: str) -> str:
+    def _post(self, envelope_xml: str, soap_action: str, result_tag: str, cache_key: str = None) -> str:
         """Envía request SOAP y extrae IdSolicitud."""
         headers = {
             "Content-Type": "text/xml;charset=UTF-8",
@@ -115,9 +151,9 @@ class ClienteSolicitud:
         except requests.RequestException as e:
             raise Exception(f"Error solicitando descarga a SAT: {e}")
 
-        return self._extraer_id_solicitud(respuesta.text, result_tag)
+        return self._extraer_id_solicitud(respuesta.text, result_tag, cache_key=cache_key)
 
-    def _extraer_id_solicitud(self, xml_respuesta: str, result_tag: str) -> str:
+    def _extraer_id_solicitud(self, xml_respuesta: str, result_tag: str, cache_key: str = None) -> str:
         """Extrae IdSolicitud de respuesta SOAP."""
         try:
             root = etree.fromstring(xml_respuesta.encode())
@@ -128,7 +164,6 @@ class ClienteSolicitud:
 
             result = root.find(f".//des:{result_tag}", ns)
             if result is None:
-                # Intentar buscar Fault
                 fault = root.find(".//faultstring")
                 detalle = fault.text if fault is not None else xml_respuesta[:300]
                 raise ValueError(f"{result_tag} no encontrado. SAT: {detalle}")
@@ -137,14 +172,28 @@ class ClienteSolicitud:
             mensaje = result.get("Mensaje", "")
             id_solicitud = result.get("IdSolicitud")
 
-            if cod_estatus not in ("5000", "5004", "5005"):
-                raise Exception(
-                    f"Error SAT código {cod_estatus}: {mensaje}"
-                )
-
-            # 5004 = sin datos, 5005 = duplicado (ya existe)
+            # 5004 = sin datos en rango
             if cod_estatus == "5004":
                 raise Exception(f"Sin datos en rango solicitado: {mensaje}")
+
+            # 5002 = solicitud duplicada (mismos parámetros ya enviados)
+            # 5005 = solicitud duplicada (variante)
+            # SAT a veces devuelve el IdSolicitud original en la respuesta;
+            # si no, caemos al cache local.
+            if cod_estatus in ("5002", "5005"):
+                if id_solicitud:
+                    return id_solicitud
+                if cache_key:
+                    cached = _cache_load().get(cache_key)
+                    if cached:
+                        return cached
+                raise Exception(
+                    f"Solicitud duplicada (código {cod_estatus}) y no hay cache local. "
+                    "Proporciona el IdSolicitud manualmente."
+                )
+
+            if cod_estatus != "5000":
+                raise Exception(f"Error SAT código {cod_estatus}: {mensaje}")
 
             if not id_solicitud:
                 raise ValueError("IdSolicitud vacío en respuesta SAT")

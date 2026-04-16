@@ -18,7 +18,7 @@ def cli():
 
 
 @cli.command()
-@click.option("--rfc", required=True, help="RFC del contribuyente")
+@click.option("--rfc", default=lambda: os.environ.get("SAT_RFC"), required=True, help="RFC del contribuyente (default: SAT_RFC en .env)")
 @click.option("--fecha-inicio", required=True, help="Fecha inicial (YYYY-MM-DD)")
 @click.option("--fecha-fin", required=True, help="Fecha final (YYYY-MM-DD)")
 @click.option(
@@ -108,8 +108,8 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
             verificador = VerificadorSolicitud(cliente_auth.certificado, token)
             resultado = verificador.verificar(id_solicitud, rfc)
         except Exception as e:
-            click.echo(f"✗ Error en verificación: {e}", err=True)
-            sys.exit(1)
+            click.echo(f"✗ Error en verificación {tipo_label}: {e}", err=True)
+            continue
 
         num_cfdis = resultado.get("num_cfdis", 0)
         ids_paquetes = resultado.get("ids_paquetes", [])

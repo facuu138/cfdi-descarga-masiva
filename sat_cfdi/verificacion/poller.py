@@ -76,8 +76,11 @@ class VerificadorSolicitud(EnvolventerSOAP):
                     f"(código {respuesta.get('codigo_estado')})"
                 )
 
+            # estado 0 = SAT aún no asignó estado (en cola), tratar como en proceso
+
+            estado_str = self.ESTADOS.get(estado, f"?({estado})")
             click.echo(
-                f"  [{intento}/{max_intentos}] Estado: {self.ESTADOS.get(estado, '?')} "
+                f"  [{intento}/{max_intentos}] Estado: {estado_str} "
                 f"— esperando {intervalo_segundos}s..."
             )
             time.sleep(intervalo_segundos)
@@ -103,7 +106,10 @@ class VerificadorSolicitud(EnvolventerSOAP):
                 timeout=30,
             )
             respuesta.raise_for_status()
-            return self._extraer_resultado(respuesta.text)
+            resultado = self._extraer_resultado(respuesta.text)
+            if resultado.get("estado", -1) == 0:
+                click.echo(f"  [DEBUG RAW] {respuesta.text[:2000]}")
+            return resultado
         except requests.RequestException as e:
             raise Exception(f"Error verificando solicitud en SAT: {e}")
 
@@ -146,7 +152,13 @@ class VerificadorSolicitud(EnvolventerSOAP):
                 detalle = fault.text if fault is not None else xml_respuesta[:300]
                 raise ValueError(f"VerificaSolicitudDescargaResult no encontrado. SAT: {detalle}")
 
-            estado = int(result.get("EstadoSolicitud", 4))
+            estado_raw = result.get("EstadoSolicitud", "")
+            try:
+                estado = int(estado_raw)
+            except (ValueError, TypeError):
+                click.echo(f"  [DEBUG] EstadoSolicitud inesperado: {estado_raw!r}")
+                click.echo(f"  [DEBUG] Atributos result: {dict(result.attrib)}")
+                estado = 4
             codigo_estado = result.get("CodigoEstadoSolicitud", "")
             num_cfdis = int(result.get("NumeroCFDIs", 0))
             mensaje = result.get("Mensaje", "")

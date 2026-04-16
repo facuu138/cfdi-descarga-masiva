@@ -7,11 +7,11 @@ NS_S = "http://schemas.xmlsoap.org/soap/envelope/"
 NS_DES = "http://DescargaMasivaTerceros.sat.gob.mx"
 
 
-def _fecha_datetime(fecha: str) -> str:
+def _fecha_datetime(fecha: str, fin: bool = False) -> str:
     """Convierte YYYY-MM-DD a datetime ISO (SAT requiere xs:dateTime)."""
     if "T" in fecha:
         return fecha
-    return fecha + "T00:00:00"
+    return fecha + ("T23:59:59" if fin else "T00:00:00")
 
 
 class ConstructorSolicitud(EnvolventerSOAP):
@@ -48,7 +48,7 @@ class ConstructorSolicitud(EnvolventerSOAP):
 
         solicitud = etree.SubElement(op, f"{{{NS_DES}}}solicitud")
         solicitud.set("FechaInicial", _fecha_datetime(fecha_inicial))
-        solicitud.set("FechaFinal", _fecha_datetime(fecha_final))
+        solicitud.set("FechaFinal", _fecha_datetime(fecha_final, fin=True))
         solicitud.set("RfcEmisor", rfc_emisor)
         solicitud.set("RfcSolicitante", rfc_solicitante)
         solicitud.set("TipoSolicitud", tipo_solicitud)
@@ -100,7 +100,7 @@ class ConstructorSolicitud(EnvolventerSOAP):
 
         solicitud = etree.SubElement(op, f"{{{NS_DES}}}solicitud")
         solicitud.set("FechaInicial", _fecha_datetime(fecha_inicial))
-        solicitud.set("FechaFinal", _fecha_datetime(fecha_final))
+        solicitud.set("FechaFinal", _fecha_datetime(fecha_final, fin=True))
         solicitud.set("RfcReceptor", rfc_receptor)
         solicitud.set("RfcSolicitante", rfc_solicitante)
         solicitud.set("TipoSolicitud", tipo_solicitud)
