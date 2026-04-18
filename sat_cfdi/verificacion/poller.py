@@ -25,16 +25,19 @@ class VerificadorSolicitud(EnvolventerSOAP):
         6: "Vencida",
     }
 
-    def __init__(self, certificado: CertificadoEfirma, token_wrap: str):
+    def __init__(self, certificado: CertificadoEfirma, token_wrap: str, cliente_autenticacion=None):
         """
         Inicializa verificador con credenciales.
 
         Args:
             certificado: CertificadoEfirma cargado
             token_wrap: Token WRAP de Autenticacion
+            cliente_autenticacion: ClienteAutenticacion opcional para refrescar token
+                                   automáticamente (necesario si el polling supera 5 min)
         """
         super().__init__(certificado)
         self.token_wrap = token_wrap
+        self._cliente_auth = cliente_autenticacion
 
     def verificar(
         self,
@@ -87,8 +90,14 @@ class VerificadorSolicitud(EnvolventerSOAP):
 
         raise Exception(f"Timeout verificando solicitud {id_solicitud}")
 
+    def _refrescar_token(self) -> None:
+        """Refresca el token WRAP si hay cliente de autenticación disponible."""
+        if self._cliente_auth is not None:
+            self.token_wrap = self._cliente_auth.autenticar()
+
     def _verificar_una_vez(self, id_solicitud: str, rfc_solicitante: str) -> dict:
         """Realiza una verificación (no espera, solo una llamada)."""
+        self._refrescar_token()
         envelope_xml = self._construir_verificacion(id_solicitud, rfc_solicitante)
 
         headers = {
