@@ -113,6 +113,8 @@ class VerificadorSolicitud(EnvolventerSOAP):
             return
         try:
             self.token_wrap = self._cliente_auth.autenticar()
+        except (TypeError, AttributeError):
+            raise
         except Exception as e:
             click.echo(
                 f"  [warn] No se pudo refrescar token ({e}); "
