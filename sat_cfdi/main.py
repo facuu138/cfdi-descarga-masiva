@@ -128,10 +128,16 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
 
         from sat_cfdi.descarga import ClienteDescarga
 
-        # Reutilizar el token más reciente del verificador (ya refrescado si fue necesario)
+        # Re-autenticar antes de descarga para garantizar token fresco
+        try:
+            token_descarga = cliente_auth.autenticar()
+        except Exception as e:
+            click.echo(f"  [warn] No se pudo re-autenticar antes de descarga ({e}); usando token del verificador.", err=True)
+            token_descarga = verificador.token_wrap
+
         cliente_descarga = ClienteDescarga(
             certificado=cliente_auth.certificado,
-            token_wrap=verificador.token_wrap,
+            token_wrap=token_descarga,
             directorio_salida=directorio_salida,
         )
 
