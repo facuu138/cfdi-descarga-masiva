@@ -5,6 +5,7 @@ import click
 from lxml import etree
 import requests
 from sat_cfdi.auth.certificado import CertificadoEfirma
+from sat_cfdi.auth.cliente import ClienteAutenticacion
 from sat_cfdi.auth.soap import EnvolventerSOAP
 
 NS_S = "http://schemas.xmlsoap.org/soap/envelope/"
@@ -26,15 +27,11 @@ class VerificadorSolicitud(EnvolventerSOAP):
         6: "Vencida",
     }
 
-    TOKEN_TTL_SEGUNDOS = 5 * 60   # TTL real del token SAT
-    TOKEN_MARGEN_SEGUNDOS = 60    # refrescar con 1 min de margen antes de expirar
-
     def __init__(
         self,
         certificado: CertificadoEfirma,
         token_wrap: str,
-        cliente_autenticacion=None,
-        token_obtenido_en: typing.Optional[float] = None,
+        cliente_autenticacion: typing.Optional[ClienteAutenticacion] = None,
     ):
         """
         Inicializa verificador con credenciales.
@@ -42,16 +39,18 @@ class VerificadorSolicitud(EnvolventerSOAP):
         Args:
             certificado: CertificadoEfirma cargado
             token_wrap: Token WRAP de Autenticacion
-            cliente_autenticacion: ClienteAutenticacion opcional para refrescar token
-                                   automáticamente cuando esté próximo a expirar
-            token_obtenido_en: time.monotonic() del momento en que se obtuvo el token.
-                               Si no se provee, se usa el momento de construcción del objeto
-                               (puede subestimar el tiempo transcurrido).
+            cliente_autenticacion: ClienteAutenticacion opcional para re-autenticar
+                                   automáticamente antes de cada intento de verificación
         """
+        if cliente_autenticacion is not None and not callable(
+            getattr(cliente_autenticacion, "autenticar", None)
+        ):
+            raise TypeError(
+                "cliente_autenticacion debe tener un método callable 'autenticar'"
+            )
         super().__init__(certificado)
         self.token_wrap = token_wrap
         self._cliente_auth = cliente_autenticacion
-        self._token_obtenido_en = token_obtenido_en if token_obtenido_en is not None else time.monotonic()
 
     def verificar(
         self,
@@ -104,20 +103,16 @@ class VerificadorSolicitud(EnvolventerSOAP):
 
         raise Exception(f"Timeout verificando solicitud {id_solicitud}")
 
-    def _refrescar_token_si_necesario(self) -> None:
-        """Refresca el token solo cuando está próximo a expirar.
+    def _refrescar_token(self) -> None:
+        """Re-autentica antes de cada poll para asegurar token vigente.
 
-        Si la re-autenticación falla, loguea un warning y continúa con
+        Si la re-autenticación falla, registra un warning y continúa con
         el token existente (puede aún ser válido).
         """
         if self._cliente_auth is None:
             return
-        elapsed = time.monotonic() - self._token_obtenido_en
-        if elapsed < self.TOKEN_TTL_SEGUNDOS - self.TOKEN_MARGEN_SEGUNDOS:
-            return  # token aún vigente
         try:
             self.token_wrap = self._cliente_auth.autenticar()
-            self._token_obtenido_en = time.monotonic()
         except Exception as e:
             click.echo(
                 f"  [warn] No se pudo refrescar token ({e}); "
@@ -127,7 +122,7 @@ class VerificadorSolicitud(EnvolventerSOAP):
 
     def _verificar_una_vez(self, id_solicitud: str, rfc_solicitante: str) -> dict:
         """Realiza una verificación (no espera, solo una llamada)."""
-        self._refrescar_token_si_necesario()
+        self._refrescar_token()
         envelope_xml = self._construir_verificacion(id_solicitud, rfc_solicitante)
 
         headers = {
