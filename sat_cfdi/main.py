@@ -3,6 +3,7 @@ import csv
 import json
 import os
 import sys
+import time
 import urllib3
 from pathlib import Path
 
@@ -82,6 +83,7 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
 
         try:
             token = cliente_auth.autenticar()
+            token_obtenido_en = time.monotonic()
         except Exception as e:
             click.echo(f"✗ Error re-autenticando para {tipo_label}: {e}", err=True)
             sys.exit(1)
@@ -108,7 +110,7 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
         click.echo("Verificando estado (puede tardar varios minutos)...")
 
         try:
-            verificador = VerificadorSolicitud(cliente_auth.certificado, token, cliente_auth)
+            verificador = VerificadorSolicitud(cliente_auth.certificado, token, cliente_auth, token_obtenido_en=token_obtenido_en)
             resultado = verificador.verificar(id_solicitud, rfc)
         except Exception as e:
             click.echo(f"✗ Error en verificación {tipo_label}: {e}", err=True)

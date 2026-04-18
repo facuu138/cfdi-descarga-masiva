@@ -1,5 +1,6 @@
 """Verificador de estado de solicitudes SolicitaDescarga."""
 import time
+import typing
 import click
 from lxml import etree
 import requests
@@ -28,7 +29,13 @@ class VerificadorSolicitud(EnvolventerSOAP):
     TOKEN_TTL_SEGUNDOS = 5 * 60   # TTL real del token SAT
     TOKEN_MARGEN_SEGUNDOS = 60    # refrescar con 1 min de margen antes de expirar
 
-    def __init__(self, certificado: CertificadoEfirma, token_wrap: str, cliente_autenticacion=None):
+    def __init__(
+        self,
+        certificado: CertificadoEfirma,
+        token_wrap: str,
+        cliente_autenticacion=None,
+        token_obtenido_en: typing.Optional[float] = None,
+    ):
         """
         Inicializa verificador con credenciales.
 
@@ -37,11 +44,14 @@ class VerificadorSolicitud(EnvolventerSOAP):
             token_wrap: Token WRAP de Autenticacion
             cliente_autenticacion: ClienteAutenticacion opcional para refrescar token
                                    automáticamente cuando esté próximo a expirar
+            token_obtenido_en: time.monotonic() del momento en que se obtuvo el token.
+                               Si no se provee, se usa el momento de construcción del objeto
+                               (puede subestimar el tiempo transcurrido).
         """
         super().__init__(certificado)
         self.token_wrap = token_wrap
         self._cliente_auth = cliente_autenticacion
-        self._token_obtenido_en = time.monotonic()
+        self._token_obtenido_en = token_obtenido_en if token_obtenido_en is not None else time.monotonic()
 
     def verificar(
         self,
