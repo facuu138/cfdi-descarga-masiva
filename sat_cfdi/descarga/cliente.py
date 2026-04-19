@@ -1,7 +1,6 @@
 """Cliente para DescargaMasiva del SAT — descarga paquetes ZIP de CFDI."""
 import base64
 import io
-import os
 import typing
 import zipfile
 from pathlib import Path
