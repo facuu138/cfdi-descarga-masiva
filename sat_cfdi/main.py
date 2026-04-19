@@ -108,7 +108,11 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
         click.echo("Verificando estado (puede tardar varios minutos)...")
 
         try:
-            verificador = VerificadorSolicitud(cliente_auth.certificado, token)
+            verificador = VerificadorSolicitud(
+                cliente_auth.certificado,
+                token,
+                cliente_autenticacion=cliente_auth,
+            )
             resultado = verificador.verificar(id_solicitud, rfc)
         except Exception as e:
             click.echo(f"✗ Error en verificación {tipo_label}: {e}", err=True)
@@ -130,8 +134,9 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
 
         cliente_descarga = ClienteDescarga(
             certificado=cliente_auth.certificado,
-            token_wrap=token,
+            token_wrap=verificador.token_wrap,
             directorio_salida=directorio_salida,
+            cliente_autenticacion=cliente_auth,
         )
 
         todos_xmls = []

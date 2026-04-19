@@ -1,15 +1,19 @@
 """Cliente para DescargaMasiva del SAT — descarga paquetes ZIP de CFDI."""
 import base64
 import io
-import os
+import typing
 import zipfile
 from pathlib import Path
 
+import click
 import requests
 from lxml import etree
 
 from sat_cfdi.auth.certificado import CertificadoEfirma
 from .constructor import ConstructorDescarga
+
+if typing.TYPE_CHECKING:
+    from sat_cfdi.auth.cliente import ClienteAutenticacion
 
 
 class ClienteDescarga:
@@ -23,6 +27,7 @@ class ClienteDescarga:
         certificado: CertificadoEfirma,
         token_wrap: str,
         directorio_salida: str = "descargas",
+        cliente_autenticacion: typing.Optional["ClienteAutenticacion"] = None,
     ):
         """
         Inicializa cliente descarga.
@@ -31,11 +36,40 @@ class ClienteDescarga:
             certificado: CertificadoEfirma cargado
             token_wrap: Token WRAP de Autenticacion
             directorio_salida: Carpeta donde guardar XMLs descomprimidos
+            cliente_autenticacion: ClienteAutenticacion opcional para re-autenticar
+                                   automáticamente antes de cada descarga de paquete
         """
+        if cliente_autenticacion is not None and not callable(
+            getattr(cliente_autenticacion, "autenticar", None)
+        ):
+            raise TypeError(
+                "cliente_autenticacion debe tener un método callable 'autenticar'"
+            )
         self.certificado = certificado
         self.token_wrap = token_wrap
         self.directorio_salida = Path(directorio_salida)
         self.constructor = ConstructorDescarga(certificado)
+        self._cliente_auth = cliente_autenticacion
+
+    def _refrescar_token(self) -> None:
+        """Re-autentica antes de cada descarga para asegurar token vigente.
+
+        Si la re-autenticación falla por un error transitorio, registra un
+        warning y continúa con el token existente (puede aún ser válido).
+        Errores de programación (TypeError, AttributeError) se re-lanzan.
+        """
+        if self._cliente_auth is None:
+            return
+        try:
+            self.token_wrap = self._cliente_auth.autenticar()
+        except (TypeError, AttributeError):
+            raise
+        except Exception as e:
+            click.echo(
+                f"  [warn] No se pudo refrescar token antes de descarga ({e}); "
+                "continuando con token actual.",
+                err=True,
+            )
 
     def descargar_paquete(self, id_paquete: str, rfc_solicitante: str) -> list[str]:
         """
@@ -51,6 +85,7 @@ class ClienteDescarga:
         Raises:
             Exception: Si falla descarga o extracción
         """
+        self._refrescar_token()
         envelope_xml = self.constructor.construir_descarga_paquete(
             id_paquete=id_paquete,
             rfc_solicitante=rfc_solicitante,
