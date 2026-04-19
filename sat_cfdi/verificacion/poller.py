@@ -106,8 +106,11 @@ class VerificadorSolicitud(EnvolventerSOAP):
     def _refrescar_token(self) -> None:
         """Re-autentica antes de cada poll para asegurar token vigente.
 
-        Si la re-autenticación falla, registra un warning y continúa con
-        el token existente (puede aún ser válido).
+        Si la re-autenticación falla por un error operativo, registra un
+        warning y continúa con el token existente (que aún puede ser válido).
+        Los `TypeError` y `AttributeError` se re-lanzan explícitamente, ya
+        que indican un error de programación o una integración inválida del
+        cliente de autenticación.
         """
         if self._cliente_auth is None:
             return
