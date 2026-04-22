@@ -56,7 +56,7 @@ class VerificadorSolicitud(EnvolventerSOAP):
         self,
         id_solicitud: str,
         rfc_solicitante: str,
-        intervalo_segundos: int = 60,
+        intervalo_segundos: int = 10,
         max_intentos: int = 120,
     ) -> dict:
         """
