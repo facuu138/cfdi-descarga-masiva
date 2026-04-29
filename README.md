@@ -53,6 +53,7 @@ SAT_KEY_PASSWORD=tu_contraseña
 | `--fecha-fin` | Sí | — | Fecha final del periodo (formato `YYYY-MM-DD`) |
 | `--rfc` | No | `SAT_RFC` en `.env` | RFC del contribuyente |
 | `--tipo` | No | `ambas` | `emitidas`, `recibidas` o `ambas` |
+| `--tipo-solicitud` | No | `CFDI` | `CFDI` (XMLs completos), `Metadata` (CSV ligero), `PDF` |
 | `--formato` | No | `xml` | `xml` (solo guarda XMLs), `json` o `csv` |
 | `--directorio-salida` | No | `descargas/` | Carpeta donde se guardan los archivos |
 | `--dry-run` | No | — | Simula sin descargar; muestra IDs de paquetes disponibles |
@@ -106,6 +107,13 @@ cfdi-descarga-masiva descargar \
   --fecha-inicio 2026-01-01 \
   --fecha-fin 2026-01-31 \
   --dry-run
+
+# Conteo rápido con Metadata (más ligero que CFDI completo)
+cfdi-descarga-masiva descargar \
+  --rfc XAXX010101000 \
+  --fecha-inicio 2026-04-01 \
+  --fecha-fin 2026-04-30 \
+  --tipo-solicitud Metadata
 ```
 
 ### Parsear un XML individual
@@ -121,6 +129,14 @@ cfdi-descarga-masiva parsear descargas/paquete-uuid/factura.xml
 | `xml` (default) | Solo guarda los XMLs descargados en `descargas/<id_paquete>/` |
 | `json` | Parsea cada CFDI y genera un archivo JSON por tipo/periodo |
 | `csv` | Parsea cada CFDI y genera un CSV con los campos principales |
+
+### Tipos de solicitud (`--tipo-solicitud`)
+
+| Tipo | Descripción |
+|------|-------------|
+| `CFDI` (default) | XMLs completos con todos los campos, conceptos e impuestos |
+| `Metadata` | CSV ligero con UUID, RFC, montos y fechas — sin conceptos ni XML raw. Útil para conteo rápido antes de la descarga completa |
+| `PDF` | PDFs de las facturas |
 
 El campo `xml_raw` (XML completo) se excluye en los formatos JSON y CSV para mantener tamaños manejables. Los XMLs originales siempre quedan en disco.
 
