@@ -31,6 +31,12 @@ def cli():
     help="Tipo de comprobantes a descargar",
 )
 @click.option(
+    "--tipo-solicitud",
+    type=click.Choice(["CFDI", "Metadata", "PDF"]),
+    default="CFDI",
+    help="Tipo de solicitud SAT (CFDI=XMLs completos, Metadata=CSV ligero, PDF)",
+)
+@click.option(
     "--formato",
     type=click.Choice(["xml", "json", "csv"]),
     default="xml",
@@ -38,7 +44,7 @@ def cli():
 )
 @click.option("--directorio-salida", default="descargas", help="Carpeta de salida")
 @click.option("--dry-run", is_flag=True, help="Simula sin descargar paquetes")
-def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dry_run):
+def descargar(rfc, fecha_inicio, fecha_fin, tipo, tipo_solicitud, formato, directorio_salida, dry_run):
     """Descarga CFDIs del SAT y los guarda en disco."""
     from sat_cfdi.auth.cliente import ClienteAutenticacion
     from sat_cfdi.solicitud import ClienteSolicitud
@@ -57,7 +63,7 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
 
     click.echo(f"Iniciando descarga para RFC: {rfc}")
     click.echo(f"Periodo: {fecha_inicio} → {fecha_fin}")
-    click.echo(f"Tipo: {tipo} | Formato: {formato}")
+    click.echo(f"Tipo: {tipo} | Solicitud: {tipo_solicitud} | Formato: {formato}")
     if dry_run:
         click.echo("Modo simulación activo — no se descargarán paquetes")
 
@@ -93,12 +99,14 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
                     fecha_inicial=fecha_inicio,
                     fecha_final=fecha_fin,
                     rfc_emisor=rfc,
+                    tipo_solicitud=tipo_solicitud,
                 )
             else:
                 id_solicitud = cliente_sol.solicitar_recibidas(
                     fecha_inicial=fecha_inicio,
                     fecha_final=fecha_fin,
                     rfc_receptor=rfc,
+                    tipo_solicitud=tipo_solicitud,
                 )
         except Exception as e:
             click.echo(f"✗ Error solicitando descarga {tipo_label}: {e}", err=True)
@@ -145,13 +153,13 @@ def descargar(rfc, fecha_inicio, fecha_fin, tipo, formato, directorio_salida, dr
             try:
                 rutas = cliente_descarga.descargar_paquete(id_paquete, rfc)
                 todos_xmls.extend(rutas)
-                click.echo(f"  ✓ {len(rutas)} XMLs extraídos → {directorio_salida}/{id_paquete}/")
+                click.echo(f"  ✓ {len(rutas)} archivos extraídos → {directorio_salida}/{id_paquete}/")
             except Exception as e:
                 click.echo(f"  ✗ Error en paquete {id_paquete}: {e}", err=True)
                 continue
 
         if formato == "xml":
-            click.echo(f"\n✓ {len(todos_xmls)} XMLs guardados en {directorio_salida}/")
+            click.echo(f"\n✓ {len(todos_xmls)} archivos guardados en {directorio_salida}/")
 
         elif formato in ("json", "csv"):
             _exportar(todos_xmls, tipo_label, rfc, fecha_inicio, fecha_fin, formato, directorio_salida)

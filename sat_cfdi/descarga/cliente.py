@@ -191,18 +191,18 @@ class ClienteDescarga:
         try:
             with zipfile.ZipFile(io.BytesIO(datos_zip)) as zf:
                 nombres = zf.namelist()
-                xmls = [n for n in nombres if n.lower().endswith(".xml")]
+                archivos = [n for n in nombres if not n.endswith("/")]
 
-                if not xmls:
+                if not archivos:
                     raise ValueError(
-                        f"Paquete {id_paquete} no contiene archivos XML"
+                        f"Paquete {id_paquete} está vacío"
                     )
 
-                for nombre_xml in xmls:
-                    datos_xml = zf.read(nombre_xml)
-                    ruta_destino = carpeta_paquete / Path(nombre_xml).name
+                for nombre_archivo in archivos:
+                    datos = zf.read(nombre_archivo)
+                    ruta_destino = carpeta_paquete / Path(nombre_archivo).name
 
-                    ruta_destino.write_bytes(datos_xml)
+                    ruta_destino.write_bytes(datos)
                     rutas_extraidas.append(str(ruta_destino.resolve()))
 
         except zipfile.BadZipFile as e:
